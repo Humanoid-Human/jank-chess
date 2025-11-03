@@ -1,4 +1,4 @@
-use crate::util::{*, Colour::*, PieceType::*};
+use crate::util::{*, Colour::*, PieceType::*, pos::*};
 
 pub struct CastleInfo {
     kingside: bool,
@@ -18,112 +18,117 @@ struct Board {
 
 impl Board {
     pub fn starting_position() -> Board {
-        let mut pieces = [None; 64];
+        let pieces = [None; 64];
+        let mut board = Board {
+            pieces,
+            white_castle: CastleInfo::new(),
+            black_castle: CastleInfo::new(),
+            turn: White
+        };
 
         // pawns
         for i in 0..8 {
-            pieces[rf_to_board((1, i))] = Some(Piece::new(White, Pawn));
-            pieces[rf_to_board((6, i))] = Some(Piece::new(Black, Pawn));
+            board.set_piece(Pos::new(1, i), Piece::some(White, Pawn));
+            board.set_piece(Pos::new(6, i), Piece::some(Black, Pawn));
         }
 
         // king and queen
-        pieces[rf_to_board((0, 3))] = Some(Piece::new(White, Queen));
-        pieces[rf_to_board((7, 3))] = Some(Piece::new(Black, Queen));
-        pieces[rf_to_board((0, 4))] = Some(Piece::new(White, King));
-        pieces[rf_to_board((7, 4))] = Some(Piece::new(Black, King));
+        board.set_piece(Pos::new(0, 3), Piece::some(White, Queen));
+        board.set_piece(Pos::new(7, 3), Piece::some(Black, Queen));
+        board.set_piece(Pos::new(0, 4), Piece::some(White, King));
+        board.set_piece(Pos::new(7, 4), Piece::some(Black, King));
 
         // other pieces
         let a = [Rook, Knight, Bishop];
         for i in 0..3 {
-            pieces[rf_to_board((0, i))] = Some(Piece::new(White, a[i as usize]));
-            pieces[rf_to_board((7, i))] = Some(Piece::new(Black, a[i as usize]));
+            let class = a[i as usize];
+            board.set_piece(Pos::new(0, i), Piece::some(White, class));
+            board.set_piece(Pos::new(7, i), Piece::some(Black, class));
+            board.set_piece(Pos::new(0, 7-i), Piece::some(White, class));
+            board.set_piece(Pos::new(7, 7-i), Piece::some(Black, class));
         }
 
-        Board { pieces, white_castle: CastleInfo::new(), black_castle: CastleInfo::new(), turn: White }
+        board
     }
 
     pub fn get_legal_moves(&self, colour: Colour) -> Vec<Move> {
         let mut out: Vec<Move> = Vec::new();
 
-        for (pos, maybe_piece) in self.pieces.iter().enumerate() {
+        for (i, maybe_piece) in self.pieces.iter().enumerate() {
             if let Some(piece) = maybe_piece && piece.colour == colour {
-                match piece.class {
-                    Rook => {
-                        self.get_sliding_moves(pos, Rook, piece.colour);
-                    },
-                    Bishop => {
-                        self.get_sliding_moves(pos, Bishop, piece.colour);
-                    },
-                    Queen =>  {
-                        self.get_sliding_moves(pos, Queen, piece.colour);
-                    },
-                    Knight =>  {
-                        self.get_knight_moves(pos, piece.colour);
-                    },
-                    King => {
-                        self.get_king_moves(pos, piece.colour);
-                    },
-                    Pawn => {
-                        self.get_pawn_moves(pos, piece.colour);
-                    }
-                }
+                let pos = Pos::from(i);
+                let mut moves = match piece.class {
+                    Rook | Bishop | Queen => self.get_sliding_moves(pos, piece.class, piece.colour),
+                    Knight => self.get_knight_moves(pos, piece.colour),
+                    King => self.get_king_moves(pos, piece.colour),
+                    Pawn => self.get_pawn_moves(pos, piece.colour)
+                };
+                out.append(&mut moves);
             }
         }
 
         out
     }
 
-    pub fn piece_at(&self, pos: usize) -> Option<Piece> {
-        self.pieces[pos]
-    }
-
     // TODO
     pub fn is_check_after(&self, moove: Move, colour: Colour) -> bool { false }
 
-    fn get_sliding_moves(&self, pos: usize, class: PieceType, colour: Colour) -> Vec<Move> {
-        let mut moves: Vec<usize> = Vec::new();
+    fn get_sliding_moves(&self, pos: Pos, class: PieceType, colour: Colour) -> Vec<Move> {
+        let mut moves: Vec<Pos> = Vec::new();
 
-        let directions = [-1, 1, 8, -8, -9, -7, 9, 7];
+        const DIR: [Pos; 8] = [
+            Pos{row: 0, col: 1},
+            Pos{row: 0, col: -1},
+            Pos{row: 1, col: 0},
+            Pos{row: -1, col: 0},
+            Pos{row: 1, col: 1},
+            Pos{row: 1, col: -1},
+            Pos{row: -1, col: 1},
+            Pos{row: -1, col: -1}
+        ];
+
         let start = if class == Bishop {4} else {0};
         let end = if class == Rook {4} else {8};
 
-        let bounds_index = {
-            let mut out = pos;
-
-            // reflect over y axis
-            if out % 8 > 3 {
-                out = 8 * (out / 8) + 7 - (out % 8);
-            }
-
-            //reflect over x axis
-            if out / 8  > 3{
-                out = (out % 8) + 8 * (7 - (out / 8));
-            }
-
-            out
-        };
-
-        for direction in &directions[start..end] {
-            let p = pos as i8;
-            while false {
-
+        for dir in &DIR[start..end] {
+            let mut p = pos + *dir;
+            while p.is_on_board() {
+                if let Some(piece) = self.get_piece(p) {
+                    if piece.colour != colour {
+                        moves.push(p);
+                    }
+                    break;
+                }
+                moves.push(p);
+                p += *dir;
             }
         }
 
-        moves.retain(
-            |x| !self.is_check_after(Move{start: pos, end: *x}, colour));
-        moves.iter().map(|x| Move {start: pos, end: *x}).collect()
+        let mut out = moves.iter()
+            .map(|x| Move {start: pos, end: *x})
+            .collect::<Vec<Move>>();
+
+        out.retain(|x| self.is_check_after(*x, colour));
+        out
     }
 
-    fn get_king_moves(&self, pos: usize, colour: Colour) -> Vec<Move> {
+    fn get_king_moves(&self, pos: Pos, colour: Colour) -> Vec<Move> {
         Vec::new()
     }
 
-    fn get_knight_moves(&self, pos: usize, colour: Colour) -> Vec<Move> {
+    fn get_knight_moves(&self, pos: Pos, colour: Colour) -> Vec<Move> {
         Vec::new()
     }
 
-    fn get_pawn_moves(&self, pos: usize, colour: Colour) -> Vec<Move> {
+    fn get_pawn_moves(&self, pos: Pos, colour: Colour) -> Vec<Move> {
         Vec::new()
+    }
+
+    pub fn get_piece(&self, pos: Pos) -> Option<Piece> {
+        self.pieces[(8 * pos.row + pos.col) as usize]
+    }
+
+    pub fn set_piece(&mut self, pos: Pos, piece: Option<Piece>) {
+        self.pieces[(8 * pos.row + pos.col) as usize] = piece;
     }
 }

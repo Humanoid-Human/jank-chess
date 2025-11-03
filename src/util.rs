@@ -1,3 +1,6 @@
+pub mod pos;
+use pos::*;
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Colour { White, Black }
 
@@ -6,24 +9,22 @@ pub enum PieceType { King, Queen, Rook, Bishop, Knight, Pawn }
 
 #[derive(Clone, Copy)]
 pub struct Move {
-    pub start: usize,
-    pub end: usize
+    pub start: Pos,
+    pub end: Pos
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy)]
 pub struct Piece {
     pub class: PieceType,
     pub colour: Colour
 }
 
 impl Piece {
-    pub fn new(colour: Colour, piece: PieceType) -> Piece { Piece { class: piece, colour } }
-}
+    pub fn new(colour: Colour, class: PieceType) -> Piece {
+        Piece { class, colour }
+    }
 
-pub fn board_to_rf(p: usize) -> (u8, u8) {
-    ((p / 8) as u8, (p % 8) as u8)
-}
-
-pub fn rf_to_board(p: (u8, u8)) -> usize {
-    (p.0 * 8 + p.1) as usize
+    pub fn some(colour: Colour, class: PieceType) -> Option<Piece> {
+        Some(Piece { class, colour })
+    }
 }
