@@ -1,11 +1,9 @@
 pub mod pos;
-use pos::*;
+pub mod piece;
+use pos::Pos;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Colour { White, Black }
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum PieceType { King, Queen, Rook, Bishop, Knight, Pawn }
 
 #[derive(Clone, Copy)]
 pub struct Move {
@@ -13,18 +11,11 @@ pub struct Move {
     pub end: Pos
 }
 
-#[derive(Clone, Copy)]
-pub struct Piece {
-    pub class: PieceType,
-    pub colour: Colour
+pub struct CastleInfo {
+    kingside: bool,
+    queenside: bool
 }
 
-impl Piece {
-    pub fn new(colour: Colour, class: PieceType) -> Piece {
-        Piece { class, colour }
-    }
-
-    pub fn some(colour: Colour, class: PieceType) -> Option<Piece> {
-        Some(Piece { class, colour })
-    }
+impl CastleInfo {
+    pub fn new() -> CastleInfo { CastleInfo { kingside: true, queenside: true } }
 }

@@ -1,13 +1,4 @@
-use crate::util::{*, Colour::*, PieceType::*, pos::*};
-
-pub struct CastleInfo {
-    kingside: bool,
-    queenside: bool
-}
-
-impl CastleInfo {
-    fn new() -> CastleInfo { CastleInfo { kingside: true, queenside: true } }
-}
+use crate::util::{*, Colour::*, piece::{*, PieceType::*}, pos::*};
 
 struct Board {
     pieces: [Option<Piece>; 64],
@@ -124,11 +115,11 @@ impl Board {
         Vec::new()
     }
 
-    pub fn get_piece(&self, pos: Pos) -> Option<Piece> {
+    fn get_piece(&self, pos: Pos) -> Option<Piece> {
         self.pieces[(8 * pos.row + pos.col) as usize]
     }
 
-    pub fn set_piece(&mut self, pos: Pos, piece: Option<Piece>) {
+    fn set_piece(&mut self, pos: Pos, piece: Option<Piece>) {
         self.pieces[(8 * pos.row + pos.col) as usize] = piece;
     }
 }
