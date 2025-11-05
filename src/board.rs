@@ -8,12 +8,19 @@ struct Board {
 }
 
 impl Board {
-    fn get_piece(&self, pos: Pos) -> Option<Piece> {
+    pub fn get_piece(&self, pos: Pos) -> Option<Piece> {
         self.pieces[(8 * pos.row + pos.col) as usize]
     }
 
-    fn set_piece(&mut self, pos: Pos, piece: Option<Piece>) {
+    pub fn set_piece(&mut self, pos: Pos, piece: Option<Piece>) {
         self.pieces[(8 * pos.row + pos.col) as usize] = piece;
+    }
+
+    pub fn is_at(&self, pos: Pos, colour: Colour, class: PieceType) -> bool {
+        if let Some(p) = self.get_piece(pos) && p.is(colour, class) {
+            return true;
+        }
+        false
     }
 
     pub fn starting_position() -> Board {
@@ -51,7 +58,7 @@ impl Board {
     }
 
     // TODO: castling
-    pub fn get_legal_moves(&self, colour: Colour) -> Vec<Move> {
+    pub fn get_legal_moves(&mut self, colour: Colour) -> Vec<Move> {
         let mut out: Vec<Move> = Vec::new();
 
         for (i, maybe_piece) in self.pieces.iter().enumerate() {
@@ -148,12 +155,68 @@ impl Board {
         } 
     }
 
-    // TODO
-    pub fn is_check_after(&self, mov: Move, colour: Colour) -> bool { 
-        false
+    pub fn is_check_after(&mut self, mov: Move, colour: Colour) -> bool { 
+        let start = self.get_piece(mov.start);
+        let end = self.get_piece(mov.end);
+        self.make_move(mov);
+        let out = self.is_in_check(colour);
+        self.set_piece(mov.start, start);
+        self.set_piece(mov.end, end);
+        return out;
     }
 
     pub fn is_in_check(&self, colour: Colour) -> bool {
+        let mut kingpos = Pos::new(-1, -1);
+        for (index, maybe_piece) in self.pieces.iter().enumerate() {
+            if let Some(piece) = maybe_piece && piece.is(Black, King) {
+                kingpos = Pos::from(index);
+                break;
+            }
+        }
+
+        // no king found
+        if !kingpos.is_on_board() {
+            return false;
+        }
+
+        for dir in &STRAIGHTS {
+            let mut p = kingpos + *dir;
+            while p.is_on_board() {
+                if let Some(piece) = self.get_piece(p) {
+                    if piece.colour == colour {
+                        break;
+                    } else if piece.class == Queen || piece.class == Rook {
+                        return true;
+                    }
+                }
+                p += *dir;
+            }
+        }
+
+        for dir in &DIAGS {
+            let mut p = kingpos + *dir;
+            if dir.row == colour.pawn_dir() && self.is_at(p, colour.opposite(), Pawn) {
+                return true;
+            }
+            while p.is_on_board() {
+                let maybe_piece = self.get_piece(p);
+                if let Some(piece) = maybe_piece {
+                    if piece.colour == colour {
+                        break;
+                    } else if piece.class == Queen || piece.class == Bishop {
+                        return true;
+                    }
+                }
+                p += *dir;
+            }
+        }
+
+        for d in KNIGHT_MOVES {
+            if self.is_at(kingpos + d, colour.opposite(), Knight) {
+                return true;
+            }
+        }
+
         false
     }
 

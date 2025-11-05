@@ -11,6 +11,20 @@ pub const CARDINALS: [Pos; 8] = [
     Pos{row: -1, col: -1}
 ];
 
+pub const STRAIGHTS: [Pos; 4] = [
+    Pos{row: 0, col: 1},
+    Pos{row: 0, col: -1},
+    Pos{row: 1, col: 0},
+    Pos{row: -1, col: 0}
+];
+
+pub const DIAGS: [Pos; 4] = [
+    Pos{row: 1, col: 1},
+    Pos{row: 1, col: -1},
+    Pos{row: -1, col: 1},
+    Pos{row: -1, col: -1}
+];
+
 pub const KNIGHT_MOVES: [Pos; 8] = [
     Pos{row: 1, col: 2},
     Pos{row: 1, col: -2},

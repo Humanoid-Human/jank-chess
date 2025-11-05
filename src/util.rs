@@ -13,6 +13,13 @@ impl Colour {
             Colour::Black => Colour::White
         }
     }
+
+    pub fn pawn_dir(&self) -> i8 {
+        match self {
+            Colour::White => 1,
+            Colour::Black => -1
+        }
+    }
 }
 
 #[derive(Clone, Copy)]

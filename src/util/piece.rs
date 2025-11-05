@@ -17,4 +17,8 @@ impl Piece {
     pub fn some(colour: Colour, class: PieceType) -> Option<Piece> {
         Some(Piece { class, colour })
     }
+
+    pub fn is(&self, colour: Colour, class: PieceType) -> bool {
+        self.colour == colour && self.class == class
+    }
 }
