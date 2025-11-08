@@ -1,4 +1,4 @@
-use std::ops::{Add, AddAssign, Mul, MulAssign};
+use std::ops::{Add, AddAssign, Mul, MulAssign, Sub};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Pos { pub row: i8, pub col: i8 }
@@ -15,6 +15,10 @@ impl Pos {
     pub fn is_on_board(&self) -> bool {
         self.row >= 0 && self.row <= 7 && self.col >= 0 && self.col <= 7
     }
+
+    pub fn bitmap(&self) -> u64 {
+        (1 as u64) << (self.row * 8 + self.col)
+    }
 }
 
 impl Add for Pos {
@@ -28,6 +32,13 @@ impl AddAssign for Pos {
     fn add_assign(&mut self, rhs: Pos) {
         self.row += rhs.row;
         self.col += rhs.col;
+    }
+}
+
+impl Sub for Pos {
+    type Output = Pos;
+    fn sub(self, rhs: Self) -> Self::Output {
+        Pos { row: self.row - rhs.row, col: self.col - rhs.col }
     }
 }
 

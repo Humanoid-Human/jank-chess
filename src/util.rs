@@ -14,10 +14,10 @@ impl Colour {
         }
     }
 
-    pub fn pawn_dir(&self) -> i8 {
+    pub fn pawn_dir(&self) -> Pos {
         match self {
-            Colour::White => 1,
-            Colour::Black => -1
+            Colour::White => Pos::new(1, 0),
+            Colour::Black => Pos::new(-1, 0)
         }
     }
 }

@@ -1,9 +1,10 @@
 use crate::util::{*, Colour::*, piece::{*, PieceType::*}, pos::*, constants::*};
 
-struct Board {
+pub struct Board {
     pieces: [Option<Piece>; 64],
     white_castle: CastleInfo,
     black_castle: CastleInfo,
+    enpassant_map: u64,
     turn: Colour
 }
 
@@ -29,13 +30,14 @@ impl Board {
             pieces,
             white_castle: CastleInfo::new(),
             black_castle: CastleInfo::new(),
+            enpassant_map: 0,
             turn: White
         };
 
         // pawns
         for i in 0..8 {
-            board.set_piece(Pos::new(1, i), Piece::some(White, Pawn));
-            board.set_piece(Pos::new(6, i), Piece::some(Black, Pawn));
+            board.set_piece(Pos::new(1, i), Piece::some(White, Pawn(true)));
+            board.set_piece(Pos::new(6, i), Piece::some(Black, Pawn(true)));
         }
 
         // king and queen
@@ -68,7 +70,7 @@ impl Board {
                     Rook | Bishop | Queen => self.get_sliding_moves(pos, piece.class, piece.colour),
                     Knight => self.get_knight_moves(pos, piece.colour),
                     King => self.get_king_moves(pos, piece.colour),
-                    Pawn => self.get_pawn_moves(pos, piece.colour)
+                    Pawn(x) => self.get_pawn_moves(pos, piece.colour, x)
                 };
                 out.append(&mut moves);
             }
@@ -129,14 +131,41 @@ impl Board {
         out
     }
 
-    // TODO
-    fn get_pawn_moves(&self, pos: Pos, colour: Colour) -> Vec<Move> {
-        Vec::new()
+    fn get_pawn_moves(&self, pos: Pos, colour: Colour, move_two: bool) -> Vec<Move> {
+        let mut out = Vec::new();
+
+        // move forward
+        let forward = colour.pawn_dir();
+        let a = pos + forward;
+        if self.get_piece(a).is_none() {
+            out.push(a);
+        }
+        // double move
+        if move_two && self.get_piece(a + forward).is_none() {
+            out.push(a + forward);
+        }
+
+        // captures
+        let mut capture = a + Pos::new(0, 1);
+        if let Some(p) = self.get_piece(capture) && p.colour == colour.opposite() {
+            out.push(capture);
+        } else if self.enpassant_map & capture.bitmap() != 0 {
+            out.push(capture);
+        }
+        capture = a + Pos::new(0, -1);
+        if let Some(p) = self.get_piece(capture) && p.colour == colour.opposite() {
+            out.push(capture);
+        } else if self.enpassant_map & capture.bitmap() != 0 {
+            out.push(capture);
+        }
+
+        out.iter().map(|x| Move{start: pos, end: *x}).collect()
     }
 
+    // does not check for legality
     pub fn make_move(&mut self, mov: Move) {
         let maybe_piece = self.get_piece(mov.start);
-        if let Some(piece) = maybe_piece {
+        if let Some(mut piece) = maybe_piece {
             if piece.class == King {
                 self.get_castle_info(piece.colour).king_moved();
             } else if piece.class == Rook {
@@ -148,6 +177,9 @@ impl Board {
                         _ => ()
                     }
                 }
+            } else if piece.class == Pawn(true) && (mov.end - mov.start).row.abs() == 2 {
+                piece.class = Pawn(false);
+                self.enpassant_map += (mov.start + piece.colour.pawn_dir()).bitmap();
             }
 
             self.set_piece(mov.start, None);
@@ -158,14 +190,21 @@ impl Board {
     pub fn is_check_after(&mut self, mov: Move, colour: Colour) -> bool { 
         let start = self.get_piece(mov.start);
         let end = self.get_piece(mov.end);
+        let old_epm = self.enpassant_map;
+
+        // simulate move to check for check
         self.make_move(mov);
         let out = self.is_in_check(colour);
+
+        // undo move
         self.set_piece(mov.start, start);
         self.set_piece(mov.end, end);
+        self.enpassant_map = old_epm;
         return out;
     }
 
     pub fn is_in_check(&self, colour: Colour) -> bool {
+        // find where king is
         let mut kingpos = Pos::new(-1, -1);
         for (index, maybe_piece) in self.pieces.iter().enumerate() {
             if let Some(piece) = maybe_piece && piece.is(Black, King) {
@@ -195,7 +234,9 @@ impl Board {
 
         for dir in &DIAGS {
             let mut p = kingpos + *dir;
-            if dir.row == colour.pawn_dir() && self.is_at(p, colour.opposite(), Pawn) {
+            if dir.row == colour.pawn_dir().row
+                && (self.is_at(p, colour.opposite(), Pawn(true)) ||
+                    self.is_at(p, colour.opposite(), Pawn(false))) {
                 return true;
             }
             while p.is_on_board() {
