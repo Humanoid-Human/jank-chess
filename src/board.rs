@@ -1,4 +1,5 @@
-use crate::util::{*, Colour::*, piece::{*, PieceType::*}, pos::*, constants::*};
+mod util;
+use util::{*, Colour::*, piece::{*, PieceType::*}, pos::*, constants::*};
 
 pub struct Board {
     pieces: [Option<Piece>; 64],
@@ -184,7 +185,9 @@ impl Board {
 
             self.set_piece(mov.start, None);
             self.set_piece(mov.end, Some(piece));
-        } 
+
+            self.turn = self.turn.opposite();
+        }
     }
 
     pub fn is_check_after(&mut self, mov: Move, colour: Colour) -> bool { 
@@ -200,7 +203,8 @@ impl Board {
         self.set_piece(mov.start, start);
         self.set_piece(mov.end, end);
         self.enpassant_map = old_epm;
-        return out;
+        
+        out
     }
 
     pub fn is_in_check(&self, colour: Colour) -> bool {

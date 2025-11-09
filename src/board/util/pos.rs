@@ -17,7 +17,7 @@ impl Pos {
     }
 
     pub fn bitmap(&self) -> u64 {
-        (1 as u64) << (self.row * 8 + self.col)
+        (1_u64) << (self.row * 8 + self.col)
     }
 }
 
