@@ -26,9 +26,8 @@ impl Board {
     }
 
     pub fn starting_position() -> Board {
-        let pieces = [None; 64];
         let mut board = Board {
-            pieces,
+            pieces: [None; 64],
             white_castle: CastleInfo::new(),
             black_castle: CastleInfo::new(),
             enpassant_map: 0,
@@ -60,7 +59,6 @@ impl Board {
         board
     }
 
-    // TODO: castling
     pub fn get_legal_moves(&mut self, colour: Colour) -> Vec<Move> {
         let mut out: Vec<Move> = Vec::new();
 
@@ -74,6 +72,22 @@ impl Board {
                     Pawn(x) => self.get_pawn_moves(pos, piece.colour, x)
                 };
                 out.append(&mut moves);
+            }
+        }
+
+        // castling
+        let ci = self.get_castle_info(colour);
+        if ci.can_castle() && !self.is_in_check(colour) {
+            let kingrow = colour.start_row();
+            if ci.queenside
+                && [1, 2, 3].iter().map(|col| Pos::new(kingrow, *col)).all(|p| self.get_piece(p).is_none())
+                && !self.is_check_after(Move{start: Pos::new(kingrow, 4), end: Pos::new(kingrow, 3)}, colour) {
+                out.push(Move{start: Pos::new(kingrow, 4), end: Pos::new(kingrow, 2)});
+            }
+            if ci.kingside
+                && [5, 6].iter().map(|col| Pos::new(kingrow, *col)).all(|p| self.get_piece(p).is_none())
+                && !self.is_check_after(Move{start: Pos::new(kingrow, 4), end: Pos::new(kingrow, 5)}, colour) {
+                out.push(Move{start: Pos::new(kingrow, 4), end: Pos::new(kingrow, 6)});
             }
         }
 
@@ -108,8 +122,7 @@ impl Board {
         let mut out = Vec::new();
 
         for mov in &CARDINALS {
-            let end = pos + *mov;
-            if let Some(piece) = self.get_piece(end) && piece.colour == colour {
+            if let Some(piece) = self.get_piece(pos + *mov) && piece.colour == colour {
                 continue;
             }
             out.push(Move{start: pos, end: pos + *mov});
@@ -122,8 +135,7 @@ impl Board {
         let mut out = Vec::new();
 
         for mov in &KNIGHT_MOVES {
-            let end = pos + *mov;
-            if let Some(piece) = self.get_piece(end) && piece.colour == colour {
+            if let Some(piece) = self.get_piece(pos + *mov) && piece.colour == colour {
                 continue;
             }
             out.push(Move{start: pos, end: pos + *mov});
@@ -140,24 +152,20 @@ impl Board {
         let a = pos + forward;
         if self.get_piece(a).is_none() {
             out.push(a);
-        }
-        // double move
-        if move_two && self.get_piece(a + forward).is_none() {
-            out.push(a + forward);
+            // double move
+            if move_two && self.get_piece(a + forward).is_none() {
+                out.push(a + forward);
+            }
         }
 
         // captures
-        let mut capture = a + Pos::new(0, 1);
-        if let Some(p) = self.get_piece(capture) && p.colour == colour.opposite() {
-            out.push(capture);
-        } else if self.enpassant_map & capture.bitmap() != 0 {
-            out.push(capture);
-        }
-        capture = a + Pos::new(0, -1);
-        if let Some(p) = self.get_piece(capture) && p.colour == colour.opposite() {
-            out.push(capture);
-        } else if self.enpassant_map & capture.bitmap() != 0 {
-            out.push(capture);
+        for offset in [Pos::new(0, 1), Pos::new(0, -1)] {
+            let capture = a + offset;
+            if let Some(p) = self.get_piece(capture) && p.colour == colour.opposite() {
+                out.push(capture);
+            } else if self.enpassant_map & capture.bitmap() != 0 {
+                out.push(capture);
+            }
         }
 
         out.iter().map(|x| Move{start: pos, end: *x}).collect()
@@ -168,9 +176,16 @@ impl Board {
         let maybe_piece = self.get_piece(mov.start);
         if let Some(mut piece) = maybe_piece {
             if piece.class == King {
-                self.get_castle_info(piece.colour).king_moved();
+                self.get_castle_info_mut(piece.colour).king_moved();
+                
+                // castling handling
+                if (mov.end - mov.start).col == 2 {
+                    self.make_move(Move{start: Pos::new(mov.start.row, 7), end: Pos::new(mov.start.row, 5)});
+                } else if (mov.end - mov.start).col == -2 {
+                    self.make_move(Move{start: Pos::new(mov.start.row, 0), end: Pos::new(mov.start.row, 3)});
+                }
             } else if piece.class == Rook {
-                let ci = self.get_castle_info(piece.colour);
+                let ci = self.get_castle_info_mut(piece.colour);
                 if mov.start.col == 0 || mov.start.col == 7 {
                     match mov.start.row {
                         0 => ci.queenside_rook(),
@@ -265,7 +280,14 @@ impl Board {
         false
     }
 
-    fn get_castle_info(&mut self, colour: Colour) -> &mut CastleInfo {
+    fn get_castle_info(&self, colour: Colour) -> CastleInfo {
+        match colour {
+            White => self.white_castle,
+            Black => self.black_castle
+        }
+    }
+
+    fn get_castle_info_mut(&mut self, colour: Colour) -> &mut CastleInfo {
         match colour {
             White => &mut self.white_castle,
             Black => &mut self.black_castle

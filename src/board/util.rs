@@ -20,6 +20,12 @@ impl Colour {
             Colour::Black => Pos::new(-1, 0)
         }
     }
+    pub fn start_row(&self) -> i8 {
+        match self {
+            Colour::White => 0,
+            Colour::Black => 7
+        }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -28,9 +34,10 @@ pub struct Move {
     pub end: Pos
 }
 
+#[derive(Clone, Copy)]
 pub struct CastleInfo {
-    kingside: bool,
-    queenside: bool
+    pub kingside: bool,
+    pub queenside: bool
 }
 
 impl CastleInfo {
@@ -44,5 +51,8 @@ impl CastleInfo {
     }
     pub fn queenside_rook(&mut self) {
         self.queenside = false;
+    }
+    pub fn can_castle(&self) -> bool {
+        self.kingside || self.queenside
     }
 }
