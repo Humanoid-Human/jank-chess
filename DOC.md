@@ -13,7 +13,11 @@
 # Enums
 - **Colour**
   - Black or White.
-  - Derives `PartialEq` and `Eq`.
+  - Derives `Clone`, `Copy`, `PartialEq` and `Eq`.
 - **PieceType**
   - King, Queen, Rook, Bishop, Knight, or Pawn.
-  - Derives `PartialEq` and `Eq`.
+  - Derives `Clone`, `Copy`, `PartialEq` and `Eq`.
+- **MoveError**
+  - Indicates the reason a move failed.
+  - OutOfBoard, NoPiece, WrongColour, or NotLegal.
+  - Derives `Clone`, `Copy`, `PartialEq` and `Eq`.
