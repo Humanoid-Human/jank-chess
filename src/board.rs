@@ -1,12 +1,13 @@
 mod util;
-use util::{*, Colour::*, piece::{*, PieceType::*}, pos::*, constants::*};
+use util::{*, Colour::*, piece::PieceType::*, constants::*};
+pub use util::{piece::*, pos::Pos, Colour};
 
 pub struct Board {
-    board: [Option<Piece>; 64],
-    white_castle: CastleInfo,
-    black_castle: CastleInfo,
-    enpassant_map: u64,
-    turn: Colour,
+    pub board: [Option<Piece>; 64],
+    pub white_castle: CastleInfo,
+    pub black_castle: CastleInfo,
+    pub enpassant_map: u64,
+    pub turn: Colour,
     move_cache: Vec<Move>,
     cache_valid: bool
 }
