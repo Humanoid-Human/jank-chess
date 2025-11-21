@@ -1,4 +1,5 @@
-# Structs
+# Documentation
+## Structs
 - **Board**
   - Represents a single game of chess
 - **Piece**
@@ -10,7 +11,7 @@
   - Implements `Add<Pos>`, `Sub<Pos>`, `Mul<i8>`, along with their `Assign` variants
   - Derives `Clone`, `Copy`, `PartialEq`, and `Eq`.
 
-# Enums
+## Enums
 - **Colour**
   - Black or White.
   - Derives `Clone`, `Copy`, `PartialEq` and `Eq`.
