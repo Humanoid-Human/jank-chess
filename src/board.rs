@@ -2,20 +2,23 @@ mod util;
 use util::{*, Colour::*, piece::{*, PieceType::*}, pos::*, constants::*};
 
 pub struct Board {
-    pieces: [Option<Piece>; 64],
+    board: [Option<Piece>; 64],
     white_castle: CastleInfo,
     black_castle: CastleInfo,
     enpassant_map: u64,
-    turn: Colour
+    turn: Colour,
+    move_cache: Vec<Move>,
+    cache_valid: bool
 }
 
 impl Board {
     pub fn get_piece(&self, pos: Pos) -> Option<Piece> {
-        self.pieces[(8 * pos.row + pos.col) as usize]
+        self.board[(8 * pos.row + pos.col) as usize]
     }
 
     pub fn set_piece(&mut self, pos: Pos, piece: Option<Piece>) {
-        self.pieces[(8 * pos.row + pos.col) as usize] = piece;
+        self.board[(8 * pos.row + pos.col) as usize] = piece;
+        self.cache_valid = false;
     }
 
     pub fn is_at(&self, pos: Pos, colour: Colour, class: PieceType) -> bool {
@@ -25,14 +28,20 @@ impl Board {
         false
     }
 
-    pub fn starting_position() -> Board {
-        let mut board = Board {
-            pieces: [None; 64],
+    pub fn empty() -> Board {
+        Board {
+            board: [None; 64],
             white_castle: CastleInfo::new(),
             black_castle: CastleInfo::new(),
             enpassant_map: 0,
-            turn: White
-        };
+            turn: White,
+            move_cache: Vec::new(),
+            cache_valid: false
+        }
+    }
+
+    pub fn starting_position() -> Board {
+        let mut board = Board::empty();
 
         // pawns
         for i in 0..8 {
@@ -59,11 +68,14 @@ impl Board {
         board
     }
 
-    pub fn get_legal_moves(&mut self, colour: Colour) -> Vec<Move> {
-        let mut out: Vec<Move> = Vec::new();
+    pub fn get_legal_moves(&mut self) -> Vec<Move> {
+        if self.cache_valid {
+            return self.move_cache.clone();
+        }
 
-        for (i, maybe_piece) in self.pieces.iter().enumerate() {
-            if let Some(piece) = maybe_piece && piece.colour == colour {
+        let mut out: Vec<Move> = Vec::new();
+        for (i, maybe_piece) in self.board.iter().enumerate() {
+            if let Some(piece) = maybe_piece && piece.colour == self.turn {
                 let pos = Pos::from(i);
                 let mut moves = match piece.class {
                     Rook | Bishop | Queen => self.get_sliding_moves(pos, piece.class, piece.colour),
@@ -76,23 +88,19 @@ impl Board {
         }
 
         // castling
-        let ci = self.get_castle_info(colour);
-        if ci.can_castle() && !self.is_in_check(colour) {
-            let kingrow = colour.start_row();
-            if ci.queenside
-                && [1, 2, 3].iter().map(|col| Pos::new(kingrow, *col)).all(|p| self.get_piece(p).is_none())
-                && !self.is_check_after(Move{start: Pos::new(kingrow, 4), end: Pos::new(kingrow, 3)}, colour) {
-                out.push(Move{start: Pos::new(kingrow, 4), end: Pos::new(kingrow, 2)});
-            }
-            if ci.kingside
-                && [5, 6].iter().map(|col| Pos::new(kingrow, *col)).all(|p| self.get_piece(p).is_none())
-                && !self.is_check_after(Move{start: Pos::new(kingrow, 4), end: Pos::new(kingrow, 5)}, colour) {
-                out.push(Move{start: Pos::new(kingrow, 4), end: Pos::new(kingrow, 6)});
-            }
+        let c = self.can_castle();
+        let kingrow = self.turn.start_row();
+        if c.0 {
+            out.push(Move{start: Pos::new(kingrow, 4), end: Pos::new(kingrow, 2)});
+        }
+        if c.1 {
+            out.push(Move{start: Pos::new(kingrow, 4), end: Pos::new(kingrow, 6)});
         }
 
-        out.retain(|x| !self.is_check_after(*x, colour));
-        out
+        out.retain(|x| !self.is_check_after(*x, self.turn));
+        self.move_cache = out;
+        self.cache_valid = true;
+        self.move_cache.clone()
     }
 
     fn get_sliding_moves(&self, pos: Pos, class: PieceType, colour: Colour) -> Vec<Move> {
@@ -171,18 +179,38 @@ impl Board {
         out.iter().map(|x| Move{start: pos, end: *x}).collect()
     }
 
+    pub fn make_move(&mut self, mov: Move) -> Result<(), ()>{
+        let maybe_piece = self.get_piece(mov.start);
+        if maybe_piece.is_none() || maybe_piece.unwrap().colour != self.turn {
+            return Err(());
+        }
+
+        // refresh cache
+        if !self.cache_valid {
+            self.get_legal_moves();
+        }
+
+        if self.move_cache.iter().all(|x| *x != mov){
+            return Err(());
+        }
+
+        self.make_move_unchecked(mov);
+
+        Ok(())
+    }
+
     // does not check for legality
-    pub fn make_move(&mut self, mov: Move) {
+    pub fn make_move_unchecked(&mut self, mov: Move) {
         let maybe_piece = self.get_piece(mov.start);
         if let Some(mut piece) = maybe_piece {
             if piece.class == King {
                 self.get_castle_info_mut(piece.colour).king_moved();
                 
                 // castling handling
-                if (mov.end - mov.start).col == 2 {
-                    self.make_move(Move{start: Pos::new(mov.start.row, 7), end: Pos::new(mov.start.row, 5)});
-                } else if (mov.end - mov.start).col == -2 {
-                    self.make_move(Move{start: Pos::new(mov.start.row, 0), end: Pos::new(mov.start.row, 3)});
+                if mov.delta().col == 2 {
+                    self.make_move_unchecked(Move::castle_kingside(piece.colour));
+                } else if mov.delta().col == -2 {
+                    self.make_move_unchecked(Move::castle_queenside(piece.colour));
                 }
             } else if piece.class == Rook {
                 let ci = self.get_castle_info_mut(piece.colour);
@@ -193,7 +221,7 @@ impl Board {
                         _ => ()
                     }
                 }
-            } else if piece.class == Pawn(true) && (mov.end - mov.start).row.abs() == 2 {
+            } else if piece.class == Pawn(true) && mov.delta().row.abs() == 2 {
                 piece.class = Pawn(false);
                 self.enpassant_map += (mov.start + piece.colour.pawn_dir()).bitmap();
             }
@@ -202,22 +230,23 @@ impl Board {
             self.set_piece(mov.end, Some(piece));
 
             self.turn = self.turn.opposite();
+            self.cache_valid = false;
         }
     }
 
-    pub fn is_check_after(&mut self, mov: Move, colour: Colour) -> bool { 
-        let start = self.get_piece(mov.start);
-        let end = self.get_piece(mov.end);
+    pub fn is_check_after(&mut self, mov: Move, colour: Colour) -> bool {
+        let old_board = self.board.clone();
         let old_epm = self.enpassant_map;
+        let old_cache_state = self.cache_valid;
 
         // simulate move to check for check
-        self.make_move(mov);
+        self.make_move_unchecked(mov);
         let out = self.is_in_check(colour);
 
         // undo move
-        self.set_piece(mov.start, start);
-        self.set_piece(mov.end, end);
+        self.board = old_board;
         self.enpassant_map = old_epm;
+        self.cache_valid = old_cache_state;
         
         out
     }
@@ -225,7 +254,7 @@ impl Board {
     pub fn is_in_check(&self, colour: Colour) -> bool {
         // find where king is
         let mut kingpos = Pos::new(-1, -1);
-        for (index, maybe_piece) in self.pieces.iter().enumerate() {
+        for (index, maybe_piece) in self.board.iter().enumerate() {
             if let Some(piece) = maybe_piece && piece.is(Black, King) {
                 kingpos = Pos::from(index);
                 break;
@@ -280,6 +309,21 @@ impl Board {
         false
     }
 
+    pub fn is_game_over(&mut self) -> Option<GameEnd> {
+        if !self.cache_valid {
+            self.get_legal_moves();
+        }
+        if self.move_cache.is_empty() {
+            if self.is_in_check(self.turn) {
+                return Some(GameEnd::Win(self.turn.opposite()));
+            } else {
+                return Some(GameEnd::Draw);
+            }
+        } else {
+            None
+        }
+    }
+
     fn get_castle_info(&self, colour: Colour) -> CastleInfo {
         match colour {
             White => self.white_castle,
@@ -291,6 +335,21 @@ impl Board {
         match colour {
             White => &mut self.white_castle,
             Black => &mut self.black_castle
+        }
+    }
+
+    fn can_castle(&mut self) -> (bool, bool) {
+        let ci = self.get_castle_info(self.turn);
+        if ci.can_castle() && !self.is_in_check(self.turn) {
+            let kingrow = self.turn.start_row();
+            (ci.queenside
+                && [1, 2, 3].iter().map(|col| Pos::new(kingrow, *col)).all(|p| self.get_piece(p).is_none())
+                && !self.is_check_after(Move{start: Pos::new(kingrow, 4), end: Pos::new(kingrow, 3)}, self.turn),
+            ci.kingside
+                && [5, 6].iter().map(|col| Pos::new(kingrow, *col)).all(|p| self.get_piece(p).is_none())
+                && !self.is_check_after(Move{start: Pos::new(kingrow, 4), end: Pos::new(kingrow, 5)}, self.turn))
+        } else {
+            (false, false)
         }
     }
 }

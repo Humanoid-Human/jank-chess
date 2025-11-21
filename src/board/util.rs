@@ -28,10 +28,32 @@ impl Colour {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Move {
     pub start: Pos,
     pub end: Pos
+}
+
+impl Move {
+    pub fn delta(&self) -> Pos {
+        self.end - self.start
+    }
+
+    pub fn castle_kingside(colour: Colour) -> Move {
+        let row = match colour {
+            Colour::White => 0,
+            Colour::Black => 7
+        };
+        Move{start: Pos::new(row, 7), end: Pos::new(row, 5)}
+    }
+
+    pub fn castle_queenside(colour: Colour) -> Move {
+        let row = match colour {
+            Colour::White => 0,
+            Colour::Black => 7
+        };
+        Move{start: Pos::new(row, 3), end: Pos::new(row, 5)}
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -55,4 +77,9 @@ impl CastleInfo {
     pub fn can_castle(&self) -> bool {
         self.kingside || self.queenside
     }
+}
+
+#[derive(PartialEq, Eq, Clone, Copy)]
+pub enum GameEnd {
+    Win(Colour), Draw
 }
