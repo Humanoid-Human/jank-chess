@@ -26,6 +26,12 @@ impl Colour {
             Colour::Black => 7
         }
     }
+    pub fn pawn_row(&self) -> i8 {
+        match self {
+            Colour::White => 1,
+            Colour::Black => 6
+        }
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]

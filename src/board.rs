@@ -46,8 +46,8 @@ impl Board {
 
         // pawns
         for i in 0..8 {
-            board.set_piece(Pos::new(1, i), Piece::some(White, Pawn(true)));
-            board.set_piece(Pos::new(6, i), Piece::some(Black, Pawn(true)));
+            board.set_piece(Pos::new(1, i), Piece::some(White, Pawn));
+            board.set_piece(Pos::new(6, i), Piece::some(Black, Pawn));
         }
 
         // king and queen
@@ -82,7 +82,7 @@ impl Board {
                     Rook | Bishop | Queen => self.get_sliding_moves(pos, piece.class, piece.colour),
                     Knight => self.get_knight_moves(pos, piece.colour),
                     King => self.get_king_moves(pos, piece.colour),
-                    Pawn(x) => self.get_pawn_moves(pos, piece.colour, x)
+                    Pawn => self.get_pawn_moves(pos, piece.colour, pos.row == self.turn.pawn_row())
                 };
                 out.append(&mut moves);
             }
@@ -203,7 +203,7 @@ impl Board {
     // does not check for legality
     pub fn make_move_unchecked(&mut self, mov: Move) {
         let maybe_piece = self.get_piece(mov.start);
-        if let Some(mut piece) = maybe_piece {
+        if let Some(piece) = maybe_piece {
             if piece.class == King {
                 self.get_castle_info_mut(piece.colour).king_moved();
                 
@@ -222,8 +222,7 @@ impl Board {
                         _ => ()
                     }
                 }
-            } else if piece.class == Pawn(true) && mov.delta().row.abs() == 2 {
-                piece.class = Pawn(false);
+            } else if piece.class == Pawn && mov.delta().row.abs() == 2 {
                 self.enpassant_map += (mov.start + piece.colour.pawn_dir()).bitmap();
             }
 
@@ -284,8 +283,7 @@ impl Board {
         for dir in &DIAGS {
             let mut p = kingpos + *dir;
             if dir.row == colour.pawn_dir().row
-                && (self.is_at(p, colour.opposite(), Pawn(true)) ||
-                    self.is_at(p, colour.opposite(), Pawn(false))) {
+                && (self.is_at(p, colour.opposite(), Pawn)) {
                 return true;
             }
             while p.is_on_board() {

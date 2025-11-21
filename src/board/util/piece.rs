@@ -1,7 +1,7 @@
 use super::Colour;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub enum PieceType { King, Queen, Rook, Bishop, Knight, Pawn(bool) }
+pub enum PieceType { King, Queen, Rook, Bishop, Knight, Pawn }
 
 #[derive(Clone, Copy)]
 pub struct Piece {
