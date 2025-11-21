@@ -89,3 +89,8 @@ impl CastleInfo {
 pub enum GameEnd {
     Win(Colour), Draw
 }
+
+#[derive(PartialEq, Eq)]
+pub enum MoveError {
+    OutOfBoard, NoPiece, WrongColour, NotLegal
+}

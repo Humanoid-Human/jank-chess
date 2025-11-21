@@ -1,6 +1,6 @@
 mod util;
 use util::{*, Colour::*, piece::PieceType::*, constants::*};
-pub use util::{piece::*, pos::Pos, Colour};
+pub use util::{MoveError, piece::*, pos::Pos, Colour};
 
 pub struct Board {
     pub board: [Option<Piece>; 64],
@@ -180,10 +180,17 @@ impl Board {
         out.iter().map(|x| Move{start: pos, end: *x}).collect()
     }
 
-    pub fn make_move(&mut self, mov: Move) -> Result<(), ()>{
+    pub fn make_move(&mut self, mov: Move) -> Result<(), MoveError>{
+        if !mov.start.is_on_board() || !mov.start.is_on_board() {
+            return Err(MoveError::OutOfBoard)
+        }
+
         let maybe_piece = self.get_piece(mov.start);
-        if maybe_piece.is_none() || maybe_piece.unwrap().colour != self.turn {
-            return Err(());
+        if maybe_piece.is_none() {
+            return Err(MoveError::NoPiece);
+        }
+        if maybe_piece.unwrap().colour != self.turn {
+            return Err(MoveError::WrongColour);
         }
 
         // refresh cache
@@ -192,7 +199,7 @@ impl Board {
         }
 
         if self.move_cache.iter().all(|x| *x != mov){
-            return Err(());
+            return Err(MoveError::NotLegal);
         }
 
         self.make_move_unchecked(mov);
@@ -235,7 +242,9 @@ impl Board {
     }
 
     pub fn is_check_after(&mut self, mov: Move, colour: Colour) -> bool {
-        let old_board = self.board.clone();
+        // store current state
+        // the array implements copy
+        let old_board = self.board;
         let old_epm = self.enpassant_map;
         let old_cache_state = self.cache_valid;
 
@@ -314,9 +323,9 @@ impl Board {
         }
         if self.move_cache.is_empty() {
             if self.is_in_check(self.turn) {
-                return Some(GameEnd::Win(self.turn.opposite()));
+                Some(GameEnd::Win(self.turn.opposite()))
             } else {
-                return Some(GameEnd::Draw);
+                Some(GameEnd::Draw)
             }
         } else {
             None
